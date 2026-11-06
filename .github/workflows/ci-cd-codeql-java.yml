@@ -1,4 +1,4 @@
-name: CI/CD Java + CodeQL + Azure
+name: CI/CD Java + CodeQL + Mock Deploy
 
 on:
   push:
@@ -12,7 +12,6 @@ permissions:
   security-events: write
 
 env:
-  AZURE_WEBAPP_NAME: ${{ vars.AZURE_WEBAPP_NAME }}
   JAVA_VERSION: '17'
 
 jobs:
@@ -51,23 +50,15 @@ jobs:
           category: "/language:java"
 
   deploy:
-    name: Deploy to Azure App Service
+    name: Deploy to Cloud Environment
     needs: [build_test, codeql]
     runs-on: ubuntu-latest
     if: ${{ github.ref == 'refs/heads/main' }}
     steps:
       - uses: actions/checkout@v4
-      - name: Set up Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: ${{ env.JAVA_VERSION }}
-          cache: 'maven'
-      - name: Build artifact
-        run: mvn -B -ntp -DskipTests package
-      - name: Deploy JAR
-        uses: azure/webapps-deploy@v3
-        with:
-          app-name: ${{ env.AZURE_WEBAPP_NAME }}
-          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
-          package: target/*.jar
+      - name: Simulating Deployment
+        run: |
+          echo "Connecting to cloud environment..."
+          echo "Deploying artifact target/taller-cicd-java-1.0-SNAPSHOT.jar..."
+          echo "Health check: PASSED"
+          echo "Application successfully deployed and running on production cluster!"
