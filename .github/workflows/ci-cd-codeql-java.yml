@@ -56,11 +56,17 @@ jobs:
           category: "/language:java"
           upload: false
 
+      - name: Locate and Copy SARIF Report
+        run: |
+          mkdir -p report_output
+          find /home/runner/work/ -name "java.sarif" -exec cp {} report_output/security-report.sarif \;
+          ls -l report_output/
+
       - name: Upload SARIF Security Report
         uses: actions/upload-artifact@v4
         with:
           name: codeql-security-report
-          path: "${{ github.workspace }}/../results/java.sarif"
+          path: report_output/security-report.sarif
           retention-days: 5
 
   deploy:
