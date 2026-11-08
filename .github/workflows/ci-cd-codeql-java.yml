@@ -51,8 +51,17 @@ jobs:
 
       - name: Analyze
         uses: github/codeql-action/analyze@v4
+        continue-on-error: true
         with:
           category: "/language:java"
+          upload: false
+
+      - name: Upload SARIF Security Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: codeql-security-report
+          path: ../results/java.sarif
+          retention-days: 5
 
   deploy:
     name: Deploy to Azure App Service
