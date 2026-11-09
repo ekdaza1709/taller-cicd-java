@@ -12,6 +12,7 @@ permissions:
   security-events: write
 
 env:
+  AZURE_WEBAPP_NAME: ${{ vars.AZURE_WEBAPP_NAME }}
   JAVA_VERSION: '17'
 
 jobs:
@@ -20,13 +21,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: ${{ env.JAVA_VERSION }}
           cache: 'maven'
-
       - name: Build (Maven) + Tests
         run: mvn -B -ntp clean verify
 
@@ -36,38 +35,20 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: ${{ env.JAVA_VERSION }}
           cache: 'maven'
-
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v4
         with:
           languages: java
           build-mode: autobuild
-
       - name: Analyze
         uses: github/codeql-action/analyze@v4
-        continue-on-error: true
         with:
           category: "/language:java"
-          upload: false
-
-      - name: Locate and Copy SARIF Report
-        run: |
-          mkdir -p report_output
-          find /home/runner/work/ -name "java.sarif" -exec cp {} report_output/security-report.sarif \;
-          ls -l report_output/
-
-      - name: Upload SARIF Security Report
-        uses: actions/upload-artifact@v4
-        with:
-          name: codeql-security-report
-          path: report_output/security-report.sarif
-          retention-days: 5
 
   deploy:
     name: Deploy to Azure App Service
@@ -76,19 +57,17 @@ jobs:
     if: ${{ github.ref == 'refs/heads/main' }}
     steps:
       - uses: actions/checkout@v4
-
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: ${{ env.JAVA_VERSION }}
           cache: 'maven'
-
       - name: Build artifact
         run: mvn -B -ntp -DskipTests package
-
-      - name: Mock Azure Deploy
-        run: |
-          echo "Conectando simuladamente a Azure App Service..."
-          echo "Subiendo artefacto target/*.jar con éxito..."
-          echo "Despliegue completado de forma exitosa en la nube!"
+      - name: Deploy JAR
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: target/*.jar
