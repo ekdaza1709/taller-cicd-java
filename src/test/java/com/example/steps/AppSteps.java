@@ -5,121 +5,111 @@ import static org.junit.jupiter.api.Assertions.*;
 import java.util.*;
 
 public class AppSteps {
-  static class Usuario {
-    String user;
-    String pass;
-    Usuario(String u, String p) { user = u; pass = p; }
-  }
 
-  private final Map<String, Usuario> usuarios = new HashMap<>();
-  private boolean autenticado = false;
+  private final Map<String, String> lectores = new HashMap<>(); // carne -> estado
+  private final Map<String, String> librosEstado = new HashMap<>(); // titulo -> estado
+  private final List<Map<String, String>> catalogo = new ArrayList<>();
+  private List<Map<String, String>> vistaCatalogo = new ArrayList<>();
+
+  private String lectorActual = null;
+  private boolean prestamoAprobado = false;
   private String ultimoError = null;
-  private final List<Map<String, String>> tareas = new ArrayList<>();
-  private List<Map<String, String>> vista = new ArrayList<>();
-  private String usuarioActual = null;
 
-  // Autenticación
-  @Dado("un usuario registrado {string} con contraseña {string}")
-  public void registrarUsuario(String u, String p) {
-    usuarios.put(u, new Usuario(u, p));
+  // HU-01: Registro de lectores
+  @Dado("que no existe un lector con carné {string}")
+  public void noExisteLector(String carne) {
+    lectores.remove(carne);
   }
 
-  @Cuando("intento iniciar sesión con usuario {string} y contraseña {string}")
-  public void intentoLogin(String u, String p) {
-    Usuario reg = usuarios.get(u);
-    if (reg != null && Objects.equals(reg.pass, p)) {
-      autenticado = true;
-      ultimoError = null;
-      usuarioActual = u;
+  @Dado("que existe un lector registrado con carné {string} y nombre {string}")
+  public void existeLector(String carne, String nombre) {
+    lectores.put(carne, "activo");
+  }
+
+  @Cuando("registro al lector con carné {string} y nombre {string}")
+  public void registrarLector(String carne, String nombre) {
+    if (lectores.containsKey(carne)) {
+      ultimoError = "Carné ya registrado";
     } else {
-      autenticado = false;
-      ultimoError = "Credenciales inválidas";
-      usuarioActual = null;
+      lectores.put(carne, "activo");
+      ultimoError = null;
     }
   }
 
-  @Entonces("el acceso es concedido")
-  public void accesoConcedido() {
-    assertTrue(autenticado);
+  @Cuando("intento registrar al lector con carné {string} y nombre {string}")
+  public void intentoRegistrarLector(String carne, String nombre) {
+    registrarLector(carne, nombre);
   }
 
-  @Entonces("el acceso es denegado con mensaje {string}")
-  public void accesoDenegado(String msg) {
-    assertFalse(autenticado);
-    assertEquals(msg, ultimoError);
+  @Entonces("el lector {string} queda registrado con estado {string}")
+  public void verificarLectorRegistrado(String carne, String estadoEsperado) {
+    assertEquals(estadoEsperado, lectores.get(carne));
   }
 
-  @Y("el estado de sesión es {string}")
-  public void estadoSesion(String esperado) {
-    assertEquals("autenticado", esperado);
-    assertTrue(autenticado);
+  @Entonces("se muestra el mensaje de error {string}")
+  public void verificarMensajeError(String mensajeEsperado) {
+    assertEquals(mensajeEsperado, ultimoError);
   }
 
-  // Alta de tareas
-  @Dado("que estoy autenticado como {string}")
-  public void autenticadoComo(String u) {
-    usuarios.putIfAbsent(u, new Usuario(u, "dummy"));
-    usuarioActual = u;
-    autenticado = true;
+  // HU-02: Préstamo de libros
+  @Dado("que estoy identificado como lector activo {string}")
+  public void identificarLectorActivo(String carne) {
+    lectores.put(carne, "activo");
+    lectorActual = carne;
     ultimoError = null;
   }
 
-  @Cuando("creo una tarea con título {string}")
-  public void crearTarea(String titulo) {
-    if (titulo == null || titulo.isBlank()) {
-      ultimoError = "Título requerido";
-      return;
-    }
-    Map<String, String> t = new HashMap<>();
-    t.put("owner", usuarioActual);
-    t.put("titulo", titulo);
-    t.put("estado", "pendiente");
-    tareas.add(t);
+  @Y("el libro {string} tiene estado {string}")
+  public void configurarEstadoLibro(String titulo, String estado) {
+    librosEstado.put(titulo, estado);
   }
 
-  @Cuando("intento crear una tarea con título {string}")
-  public void intentoCrearTarea(String titulo) {
-    crearTarea(titulo);
-  }
-
-  @Entonces("la tarea existe en mi lista")
-  public void tareaExiste() {
-    assertTrue(tareas.stream().anyMatch(t -> t.get("owner").equals(usuarioActual)));
-  }
-
-  @Entonces("su estado es {string}")
-  public void estadoTarea(String estado) {
-    assertEquals(estado, tareas.get(tareas.size() - 1).get("estado"));
-  }
-
-  @Entonces("se muestra un error {string}")
-  public void seMuestraError(String esperado) {
-    assertEquals(esperado, ultimoError);
-  }
-
-  // Listado y filtro
-  @Y("existen las tareas:")
-  public void existenTareas(io.cucumber.datatable.DataTable table) {
-    for (var row : table.asMaps()) {
-      Map<String, String> t = new HashMap<>(row);
-      t.put("owner", usuarioActual);
-      tareas.add(t);
+  @Cuando("solicito el préstamo del libro {string}")
+  public void solicitarPrestamo(String titulo) {
+    String estado = librosEstado.get(titulo);
+    if ("activo".equals(lectores.get(lectorActual)) && "disponible".equals(estado)) {
+      prestamoAprobado = true;
+      librosEstado.put(titulo, "prestado");
+      ultimoError = null;
+    } else {
+      prestamoAprobado = false;
+      ultimoError = "Libro no disponible";
     }
   }
 
-  @Cuando("consulto mis tareas")
-  public void consultoMisTareas() {
-    vista = tareas.stream().filter(t -> t.get("owner").equals(usuarioActual)).toList();
+  @Entonces("el préstamo es aprobado")
+  public void verificarPrestamoAprobado() {
+    assertTrue(prestamoAprobado);
   }
 
-  @Cuando("filtro mis tareas por {string}")
-  public void filtroMisTareasPor(String estado) {
-    consultoMisTareas();
-    vista = vista.stream().filter(t -> estado.equals(t.get("estado"))).toList();
+  @Y("el estado del libro {string} pasa a {string}")
+  public void verificarEstadoLibro(String titulo, String estadoEsperado) {
+    assertEquals(estadoEsperado, librosEstado.get(titulo));
   }
 
-  @Entonces("veo {int} tarea\\(s)")
-  public void veoN(int n) {
-    assertEquals(n, vista.size());
+  // HU-03: Catálogo y filtro
+  @Dado("que existen los siguientes libros en el catálogo:")
+  public void cargarCatalogo(io.cucumber.datatable.DataTable table) {
+    catalogo.clear();
+    for (var fila : table.asMaps()) {
+      catalogo.add(new HashMap<>(fila));
+    }
+  }
+
+  @Cuando("consulto el catálogo completo")
+  public void consultarCatalogo() {
+    vistaCatalogo = new ArrayList<>(catalogo);
+  }
+
+  @Cuando("filtro el catálogo por categoría {string}")
+  public void filtrarCatalogo(String categoria) {
+    vistaCatalogo = catalogo.stream()
+        .filter(libro -> categoria.equals(libro.get("categoria")))
+        .toList();
+  }
+
+  @Entonces("veo {int} libro\\(s) en la lista")
+  public void verificarCantidadLibros(int cantidadEsperada) {
+    assertEquals(cantidadEsperada, vistaCatalogo.size());
   }
 }
